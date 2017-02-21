@@ -49,12 +49,12 @@
           <a class="navbar-brand" href="#">Sentifi Programming Test</a>
       </div>
       <div id="navbar" class="navbar-collapse collapse">
-        <form ng-submit="getData()" class="navbar-form navbar-right" role="form">
+        <form ng-submit="searchTicker()" class="navbar-form navbar-right" role="form">
           <div class="form-group">
-            <input type="text" ng-model="tickerSymbol" placeholder="Ticker Symbol (Ex: GOOG)" class="form-control">
+            <input type="text" ng-model="tickerSymbol" placeholder="(Ex: GOOG, GE, MSFT)" class="form-control">
           </div>
           <div class="form-group">
-            <input type="number" ng-model="minClosePrice" placeholder="Min Close Price" class="form-control">
+            <input type="text" ng-model="minClosePrice" placeholder="Min Close Price" class="form-control" ng-change="updateBounceList()">
           </div>
           <button type="submit" class="btn btn-success">Search</button>
         </form>
@@ -64,11 +64,22 @@
   </nav>
 
   <!-- container -->
-  <div class="container">
+  <div class="container-fluid">
 
     <div class="row">
-      <div class="col-md-12">
-        <nvd3 options="chartOptions" data="chartData" config="chartConfig" api="chartApi"></nvd3>
+      <div class="col-xs-12">
+        <div class="row row-eq-height">
+          <div class="col-xs-9">
+            <nvd3 options="chartOptions" data="chartData" config="chartConfig" api="chartApi"></nvd3>
+          </div>
+          <div class="col-xs-3">
+            <div id="bounceList">
+              <ul class="list-unstyled" ng-repeat="option in bounceList">
+                <li>{{option[0]}} ${{option[1]}}</li>
+              </ul>
+            </div>
+          </div>
+        </div>
         <div class="spinner" ng-show="loading">
           <div class="ajax-loader"></div>
         </div>
@@ -77,34 +88,10 @@
 
     <div class="row">
       <div class="col-md-12">
-        <div class="btn-group" data-toggle="buttons">
-          <label class="btn btn-primary">
-            <input type="radio" autocomplete="off" ng-model="dateRange" value="{{dateRanges.ALL}}" />
-            All
-          </label>
-          <label class="btn btn-primary" ng-class="{active: dateRange == dateRanges.FIVE_YEARS}">
-            <input type="radio" autocomplete="off" ng-model="dateRange" value="{{dateRanges.FIVE_YEARS}}" />
-            5 years
-          </label>
-          <label class="btn btn-primary" ng-class="{active: dateRange == dateRanges.ONE_YEAR}">
-            <input type="radio" autocomplete="off" ng-model="dateRange" value="{{dateRanges.ONE_YEAR}}" />
-            1 year
-          </label>
-          <label class="btn btn-primary">
-            <input type="radio" autocomplete="off" ng-model="dateRange" value="{{dateRanges.SIX_MONTHS}}" />
-            6 months
-          </label>
-          <label class="btn btn-primary">
-            <input type="radio" autocomplete="off" ng-model="dateRange" value="{{dateRanges.THREE_MONTHS}}" />
-            3 months
-          </label>
-          <label class="btn btn-primary">
-            <input type="radio" autocomplete="off" ng-model="dateRange" value="{{dateRanges.ONE_MONTH}}" />
-            1 month
-          </label>
-          <label class="btn btn-primary">
-            <input type="radio" autocomplete="off" ng-model="dateRange" value="{{dateRanges.ONE_WEEK}}" />
-            1 week
+        <div id="dateRanges" class="btn-group">
+          <label class="btn btn-primary" ng-class="{active: dateRange == option}" ng-repeat="option in dateRanges track by $index">
+          <input type="radio" autocomplete="off" name="dateRange" value="{{option}}" ng-value="option" ng-model="$parent.dateRange" />
+          {{ option }}
           </label>
         </div>
       </div>
