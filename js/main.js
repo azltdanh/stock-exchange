@@ -1,3 +1,7 @@
+function debug() {
+    console.debug('Stock-Exchange', arguments);
+}
+
 var app = angular.module('myApp', ['nvd3']);
 
 app.constant('DATE_RANGES', {
@@ -7,58 +11,56 @@ app.constant('DATE_RANGES', {
     "SIX_MONTHS": "6-months",
     "THREE_MONTHS": "3-months",
     "ONE_MONTH": "1-month",
-    "ONE_WEEK": "1-week"
+    "ONE_WEEK": "1-week",
+    // "TODAY": "today"
 });
 
-app.factory('ApiService', function ($http, $q, DATE_RANGES) {
+app.factory('apiService', function ($http, $q, DATE_RANGES) {
 
-    function ApiService() {
+    function apiService() {
 
         var self = this;
 
         var cachedRawData = {};
         var cachedChartData = {};
 
-        self.fetchApiData = function (tickerSymbol) {
-            console.debug('fetchApiData', tickerSymbol);
+        var fetchApiData = function (tickerSymbol) {
+            debug('fetchApiData', tickerSymbol);
 
             var deferred = $q.defer();
 
-            var apiUrl = 'https://www.quandl.com/api/v3/datasets/WIKI/{}.json?api_key=iqo1wQDkUJFTyCnb7A1m'.replace(/{}/g, tickerSymbol);
+            var apiUrl = 'https://www.quandl.com/api/v3/datasets/WIKI/{}.json?api_key=iqo1wQDkUJFTyCnb7A1m'
+                .replace(/{}/g, tickerSymbol);
+
             $http.get(apiUrl).then(
                 function (response) {
-                    console.debug('fetchApiData', response.data);
+                    debug('fetchApiData', response.data, 'SUCCEED');
                     deferred.resolve(response.data);
                 },
                 function (response) {
-                    // Error handle
-                    console.error('fetchApiData', response);
                     switch (response.status) {
                         case 404:
-                            // show error message
                             break;
                     }
+                    debug('fetchApiData', response, 'FAILED');
                     deferred.reject(response);
                 });
 
             return deferred.promise;
         };
 
-
-        self.getTickerRawData = function (tickerSymbol) {
-            console.debug('getTickerRawData', tickerSymbol);
+        var getTickerRawData = function (tickerSymbol) {
+            debug('getTickerRawData', tickerSymbol);
 
             var deferred = $q.defer();
 
-            // get from cache
             var tickerRawData = cachedRawData[tickerSymbol];
             if (tickerRawData) {
-                console.debug('getTickerRawData', tickerRawData, 'CACHED');
+                debug('getTickerRawData', tickerRawData, 'CACHED');
                 deferred.resolve(tickerRawData);
             }
-            // get from api
             else {
-                self.fetchApiData(tickerSymbol).then(
+                fetchApiData(tickerSymbol).then(
                     function (data) {
                         tickerRawData = data;
 
@@ -67,22 +69,21 @@ app.factory('ApiService', function ($http, $q, DATE_RANGES) {
                             cachedRawData[tickerSymbol] = tickerRawData;
                         }
 
-                        console.debug('getTickerRawData', tickerRawData);
+                        debug('getTickerRawData', tickerRawData, 'SUCCEED');
                         deferred.resolve(tickerRawData);
                     },
-                    function () {
-                        console.error('getTickerRawData', 'FAILED');
-                        deferred.reject(null);
+                    function (response) {
+                        debug('getTickerRawData', response, 'FAILED');
+                        deferred.reject(response);
                     }
                 );
-
             }
 
             return deferred.promise;
         };
 
-        self.getMinDateToDisplay = function (dateRange) {
-            console.debug('getMinDateToDisplay', dateRange);
+        var getMinDateToDisplay = function (dateRange) {
+            debug('getMinDateToDisplay', dateRange);
 
             var minDateToDisplay = 0;
             var today = new Date();
@@ -108,43 +109,48 @@ app.factory('ApiService', function ($http, $q, DATE_RANGES) {
                 case DATE_RANGES.ONE_WEEK:
                     minDateToDisplay = new Date().setDate(today.getDate() - 7);
                     break;
+                case DATE_RANGES.TODAY:
+                    minDateToDisplay = today;
+                    break;
                 default:
                     minDateToDisplay = 0;
             }
+
+            debug('getMinDateToDisplay', dateRange, minDateToDisplay);
             return minDateToDisplay || 0;
         };
 
         self.getTickerChartData = function (tickerSymbol, dateRange) {
-            console.debug('getTickerChartData', tickerSymbol, dateRange);
+            tickerSymbol = tickerSymbol.toUpperCase();
+
+            debug('getTickerChartData', tickerSymbol, dateRange);
 
             var deferred = $q.defer();
 
-            var cacheKey = tickerSymbol + '_' + dateRange;
+            var cacheKey = tickerSymbol + '-' + dateRange;
 
-            // get from cache
             var tickerChartData = cachedChartData[cacheKey];
             if (tickerChartData) {
-                console.debug('getTickerChartData', tickerChartData, 'CACHED');
+                debug('getTickerChartData', tickerChartData, 'CACHED');
                 deferred.resolve(tickerChartData);
             }
-            // get from raw data
             else {
-                self.getTickerRawData(tickerSymbol).then(
+                getTickerRawData(tickerSymbol).then(
                     function (tickerRawData) {
                         if (tickerRawData) {
 
                             // filter by fields
                             tickerChartData = tickerRawData.dataset.data
                                 .map(function (arr) {
-                                    return [arr[0], arr[4]]; // [Date, ClosePrice]
+                                    return [arr[0], arr[4], new Date(arr[0])]; // [Date, ClosePrice, Date.toTime()]
                                 });
 
                             // filter by minDateToDisplay
-                            var minDateToDisplay = self.getMinDateToDisplay(dateRange);
+                            var minDateToDisplay = getMinDateToDisplay(dateRange);
                             if (minDateToDisplay > 0) {
                                 tickerChartData = tickerChartData
                                     .filter(function (arr, idx) {
-                                        return new Date(arr[0]) >= minDateToDisplay;
+                                        return arr[2] >= minDateToDisplay;
                                     });
                             }
 
@@ -154,15 +160,14 @@ app.factory('ApiService', function ($http, $q, DATE_RANGES) {
                             }
                         }
 
-                        console.debug('getTickerChartData', tickerChartData);
+                        debug('getTickerChartData', tickerChartData, 'SUCCEED');
                         deferred.resolve(tickerChartData);
                     },
-                    function () {
-                        console.error('getTickerChartData', 'FAILED');
-                        deferred.reject(null);
+                    function (response) {
+                        debug('getTickerChartData', response, 'FAILED');
+                        deferred.reject(response);
                     }
                 );
-
             }
 
             return deferred.promise;
@@ -170,16 +175,14 @@ app.factory('ApiService', function ($http, $q, DATE_RANGES) {
 
     }
 
-    return new ApiService();
+    return new apiService();
 });
 
-app.controller('MainCtrl', function ($scope, $q, DATE_RANGES, ApiService) {
+app.controller('mainCtrl', function ($scope, $q, DATE_RANGES, apiService) {
     $scope.dateRanges = DATE_RANGES;
-    $scope.tickerChartData = null;
-
-    $scope.tickerSymbol = 'GOOG';
-    $scope.minClosePrice = '400';
     $scope.dateRange = DATE_RANGES.ONE_YEAR;
+    // $scope.tickerSymbol = 'GOOG';
+    // $scope.minClosePrice = '800';
 
     $scope.bounceList = [];
 
@@ -194,18 +197,17 @@ app.controller('MainCtrl', function ($scope, $q, DATE_RANGES, ApiService) {
         deepWatchDataDepth: 2, // default: 2
         debounce: 10 // default: 10
     };
-
     $scope.chartOptions = {
         chart: {
             type: 'stackedAreaChart',
-            height: 450,
+            height: 449,
             margin: {
-                top: 20,
-                right: 20,
+                top: 30,
+                right: 0,
                 bottom: 30,
                 left: 40
             },
-            x: function (d) { return d[0]; },
+            x: function (d) { return d[2]; },
             y: function (d) { return d[1]; },
             useVoronoi: false,
             clipEdge: true,
@@ -230,92 +232,85 @@ app.controller('MainCtrl', function ($scope, $q, DATE_RANGES, ApiService) {
                 horizontalOff: false,
                 verticalOff: true,
                 unzoomEventType: 'dblclick.zoom'
-            },
-            dispatch: {
-                // stateChange: function (e) { console.log('stateChange'); },
-                // changeState: function (e) { console.log('changeState'); },
-                // tooltipShow: function (e) { console.log('tooltipShow'); },
-                // tooltipHide: function (e) { console.log('tooltipHide'); },
-                // renderStart: function (e) { console.log('renderStart'); },
-                // renderEnd: function (e) { console.log('renderEnd'); }
             }
         }
     };
 
-    $scope.chartData = [
-        {
-            "key": "",
-            "values": []
-        }
-    ];
-
-    function resetChart() {
-        // clear chart details
+    function reset() {
+        // clear chart 
         $scope.chartData = [
             {
                 "key": "",
                 "values": []
             }
         ];
-        $scope.chartApi.refresh();
-        $scope.chartConfig.disabled = true;
-
-        $scope.tickerChartData = null;
-        $scope.bounceList = [];
     }
+    reset();
 
     $scope.searchTicker = function () {
-        var tickerSymbol = $scope.tickerSymbol;
         var dateRange = $scope.dateRange;
-        var minClosePrice = parseInt($scope.minClosePrice);
+        var tickerSymbol = $scope.tickerSymbol;
 
-        $scope.loading = true;
-        try {
-            if (tickerSymbol) {
-                ApiService.getTickerChartData(tickerSymbol, dateRange)
-                    .then(
+        if (tickerSymbol && dateRange) {
+            reset();
+            $scope.loading = true;
+            try {
+                apiService.getTickerChartData(tickerSymbol, dateRange).then(
                     function (tickerChartData) {
-                        // display ticker data
-                        if (tickerChartData) {
-                            $scope.tickerChartData = tickerChartData;
-
-                            // refresh chart with new data
+                        if (tickerChartData && tickerChartData.length) {
+                            // refresh chart data
                             $scope.chartData = [
                                 {
                                     "key": tickerSymbol.toUpperCase(),
-                                    "values": tickerChartData.map(function (arr) { return [new Date(arr[0]).getTime(), arr[1]]; }).reverse()
+                                    "values": tickerChartData.reverse()
                                 }
                             ];
-                            $scope.chartApi.refresh();
-                            $scope.chartConfig.disabled = false;
-
-                            $scope.updateBounceList();
                         }
                         else {
-                            resetChart();
+                            throw "204 No Content";
                         }
                     },
-                    function () {
-                        resetChart();
+                    function (response) {
+                        throw response;
                     })
                     .finally(function () {
                         $scope.loading = false;
                     });
             }
-            else {
-                throw "400 Bad Request";
+            catch (ex) {
+                debug(ex);
+                $scope.loading = false;
             }
         }
-        catch (ex) {
-            console.error(ex);
-            $scope.loading = false;
-            resetChart();
+        else {
+            // throw "400 Bad Request";
         }
-
     };
 
-    $scope.updateBounceList = function () {
-        var tickerChartData = $scope.tickerChartData;
+    $scope.$watch('dateRange', function (dateRange) {
+        $scope.searchTicker();
+    });
+
+    $scope.$watch('chartData', function (chartData) {
+        if (chartData[0].key) {
+            debug('showChart', chartData);
+            if ($scope.chartApi) $scope.chartApi.refresh();
+            $scope.chartConfig.disabled = false;
+        }
+        else {
+            debug('hideChart');
+            if ($scope.chartApi) $scope.chartApi.refresh();
+            $scope.chartConfig.disabled = true;
+        }
+        $scope.refreshBounceList();
+    });
+
+    $scope.$watch('minClosePrice', function (minClosePrice) {
+        $scope.refreshBounceList();
+    });
+
+    $scope.refreshBounceList = function () {
+        var tickerChartData = $scope.chartData[0].values.slice().reverse();
         var minClosePrice = parseInt($scope.minClosePrice);
         if (tickerChartData && minClosePrice > 0) {
             $scope.bounceList = tickerChartData.filter(function (arr) {
@@ -325,14 +320,10 @@ app.controller('MainCtrl', function ($scope, $q, DATE_RANGES, ApiService) {
         else {
             $scope.bounceList = [];
         }
-    }
+    };
 
-    $scope.$watch('dateRange', function (value) {
-        $scope.searchTicker();
-    });
+});
 
-    $scope.$watch('minClosePrice', function (value) {
-        $scope.updateBounceList();
-    });
-
+angular.element(function () {
+    angular.bootstrap(document, ['myApp']);
 });
