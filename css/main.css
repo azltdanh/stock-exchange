@@ -63,10 +63,6 @@ code {
   display: none;
 }
 
-#formFilter {
-  margin-top: 20px;
-}
-
 #bounceList .table {
   margin: 0;
 }
@@ -82,9 +78,6 @@ code {
   .row-eq-height > [class*='col-'] {
     display: flex;
     flex-direction: column;
-  }
-  #formFilter{
-    margin-top: 0;
   }
   #bounceList{
   overflow: auto;
